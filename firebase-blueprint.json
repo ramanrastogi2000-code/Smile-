@@ -1,0 +1,343 @@
+{
+  "entities": {
+    "UserSettings": {
+      "title": "UserSettings",
+      "description": "Private user account, PII, privacy preferences, and salted security hashes.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "email": { "type": "string" },
+        "phoneNumber": { "type": "string" },
+        "countryCode": { "type": "string" },
+        "language": { "type": "string", "enum": ["EN", "HI"] },
+        "darkMode": { "type": "boolean" },
+        "wallpaperId": { "type": "string" },
+        "autoDownloadWifi": { "type": "boolean" },
+        "dataSaver": { "type": "boolean" },
+        "readReceipts": { "type": "boolean" },
+        "notificationsEnabled": { "type": "boolean" },
+        "appLockEnabled": { "type": "boolean" },
+        "pinHash": { "type": "string" },
+        "twoStepHash": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "countryCode", "language", "darkMode", "wallpaperId", "autoDownloadWifi", "dataSaver", "readReceipts", "notificationsEnabled", "appLockEnabled", "createdAt", "updatedAt"]
+    },
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Public chat identity without PII, including ECDH P-256 public key for E2EE.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "displayName": { "type": "string" },
+        "smileId": { "type": "string" },
+        "about": { "type": "string" },
+        "avatarColor": { "type": "string" },
+        "avatarData": { "type": "string" },
+        "publicKey": { "type": "string" },
+        "online": { "type": "boolean" },
+        "discoverable": { "type": "boolean" },
+        "photoVisible": { "type": "string", "enum": ["EVERYONE", "CONTACTS", "NOBODY"] },
+        "aboutVisible": { "type": "string", "enum": ["EVERYONE", "CONTACTS", "NOBODY"] },
+        "lastSeenVisible": { "type": "string", "enum": ["EVERYONE", "CONTACTS", "NOBODY"] },
+        "lastSeenAt": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "displayName", "smileId", "about", "avatarColor", "online", "discoverable", "photoVisible", "aboutVisible", "lastSeenVisible", "createdAt", "updatedAt"]
+    },
+    "SmileIdReservation": {
+      "title": "SmileIdReservation",
+      "description": "Unique Smile ID reservation preventing duplicate accounts.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "smileId": { "type": "string" },
+        "displayName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "smileId", "displayName", "createdAt"]
+    },
+    "PhoneLookup": {
+      "title": "PhoneLookup",
+      "description": "SHA-256 hashed phone lookup for private contact discovery.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "smileId": { "type": "string" },
+        "displayName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "smileId", "displayName", "createdAt", "updatedAt"]
+    },
+    "UserContact": {
+      "title": "UserContact",
+      "description": "User's saved or synced contact entry.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "contactUid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "smileId": { "type": "string" },
+        "phoneHint": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "contactUid", "displayName", "smileId", "createdAt", "updatedAt"]
+    },
+    "BlockedUser": {
+      "title": "BlockedUser",
+      "description": "Blocked user entry scoped under owner.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "blockedUid": { "type": "string" },
+        "blockedName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "blockedUid", "blockedName", "createdAt"]
+    },
+    "AppNotification": {
+      "title": "AppNotification",
+      "description": "In-app notification entry scoped under owner.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "body": { "type": "string" },
+        "category": { "type": "string" },
+        "referenceId": { "type": "string" },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "body", "category", "read", "createdAt"]
+    },
+    "ChatRoom": {
+      "title": "ChatRoom",
+      "description": "1-to-1 or Group chat room metadata.",
+      "type": "object",
+      "properties": {
+        "chatType": { "type": "string", "enum": ["DIRECT", "GROUP"] },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "avatarColor": { "type": "string" },
+        "memberUids": { "type": "array" },
+        "adminUids": { "type": "array" },
+        "coAdminUids": { "type": "array" },
+        "pinnedBy": { "type": "array" },
+        "archivedBy": { "type": "array" },
+        "mutedBy": { "type": "array" },
+        "typingUids": { "type": "array" },
+        "lastMessageText": { "type": "string" },
+        "lastMessageSenderId": { "type": "string" },
+        "lastMessageType": { "type": "string" },
+        "disappearingHours": { "type": "integer" },
+        "announcementsOnly": { "type": "boolean" },
+        "inviteCode": { "type": "string" },
+        "communityId": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["chatType", "title", "description", "avatarColor", "memberUids", "adminUids", "coAdminUids", "pinnedBy", "archivedBy", "mutedBy", "typingUids", "lastMessageText", "lastMessageSenderId", "lastMessageType", "disappearingHours", "announcementsOnly", "inviteCode", "communityId", "createdBy", "createdAt", "updatedAt"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "Real-time chat message with optional E2EE ciphertext and denormalized memberUids.",
+      "type": "object",
+      "properties": {
+        "chatId": { "type": "string" },
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "memberUids": { "type": "array" },
+        "messageType": { "type": "string", "enum": ["TEXT", "IMAGE", "AUDIO", "DOCUMENT", "LOCATION", "CONTACT", "STICKER", "SYSTEM"] },
+        "body": { "type": "string" },
+        "iv": { "type": "string" },
+        "e2ee": { "type": "boolean" },
+        "replyToId": { "type": "string" },
+        "replyPreview": { "type": "string" },
+        "forwarded": { "type": "boolean" },
+        "edited": { "type": "boolean" },
+        "deletedForEveryone": { "type": "boolean" },
+        "deletedFor": { "type": "array" },
+        "starredBy": { "type": "array" },
+        "reactions": { "type": "object" },
+        "deliveryStatus": { "type": "string", "enum": ["SENT", "DELIVERED", "READ"] },
+        "mediaName": { "type": "string" },
+        "mediaMime": { "type": "string" },
+        "mediaData": { "type": "string" },
+        "expiresAt": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["chatId", "senderId", "senderName", "memberUids", "messageType", "body", "iv", "e2ee", "replyToId", "replyPreview", "forwarded", "edited", "deletedForEveryone", "deletedFor", "starredBy", "reactions", "deliveryStatus", "createdAt", "updatedAt"]
+    },
+    "StatusUpdate": {
+      "title": "StatusUpdate",
+      "description": "24-hour expiring status update.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "authorSmileId": { "type": "string" },
+        "statusType": { "type": "string", "enum": ["TEXT", "IMAGE"] },
+        "textContent": { "type": "string" },
+        "caption": { "type": "string" },
+        "bgColor": { "type": "string" },
+        "mediaData": { "type": "string" },
+        "privacyMode": { "type": "string", "enum": ["EVERYONE", "CONTACTS", "ONLY"] },
+        "allowedUids": { "type": "array" },
+        "viewerUids": { "type": "array" },
+        "expiresAt": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "authorName", "authorSmileId", "statusType", "textContent", "caption", "bgColor", "privacyMode", "allowedUids", "viewerUids", "expiresAt", "createdAt", "updatedAt"]
+    },
+    "StatusView": {
+      "title": "StatusView",
+      "description": "Status viewer receipt record.",
+      "type": "object",
+      "properties": {
+        "statusId": { "type": "string" },
+        "viewerUid": { "type": "string" },
+        "viewerName": { "type": "string" },
+        "ownerUid": { "type": "string" },
+        "viewedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["statusId", "viewerUid", "viewerName", "ownerUid", "viewedAt"]
+    },
+    "CallRecord": {
+      "title": "CallRecord",
+      "description": "WebRTC call signaling session and call history entry.",
+      "type": "object",
+      "properties": {
+        "callerId": { "type": "string" },
+        "callerName": { "type": "string" },
+        "title": { "type": "string" },
+        "participantUids": { "type": "array" },
+        "callType": { "type": "string", "enum": ["VOICE", "VIDEO"] },
+        "groupCall": { "type": "boolean" },
+        "callStatus": { "type": "string", "enum": ["RINGING", "ACTIVE", "ENDED", "MISSED", "DECLINED"] },
+        "sdpOffer": { "type": "string" },
+        "sdpAnswer": { "type": "string" },
+        "iceCandidates": { "type": "array" },
+        "durationSeconds": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["callerId", "callerName", "title", "participantUids", "callType", "groupCall", "callStatus", "sdpOffer", "sdpAnswer", "iceCandidates", "durationSeconds", "createdAt", "updatedAt"]
+    },
+    "Community": {
+      "title": "Community",
+      "description": "Community grouping related groups and official announcements.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "adminUids": { "type": "array" },
+        "memberUids": { "type": "array" },
+        "groupIds": { "type": "array" },
+        "announcementText": { "type": "string" },
+        "avatarColor": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "description", "ownerId", "adminUids", "memberUids", "groupIds", "announcementText", "avatarColor", "createdAt", "updatedAt"]
+    },
+    "ReportItem": {
+      "title": "ReportItem",
+      "description": "User abuse or technical issue report.",
+      "type": "object",
+      "properties": {
+        "reporterId": { "type": "string" },
+        "targetUid": { "type": "string" },
+        "targetType": { "type": "string", "enum": ["USER", "GROUP", "TECHNICAL"] },
+        "reason": { "type": "string" },
+        "details": { "type": "string" },
+        "reportStatus": { "type": "string", "enum": ["OPEN", "REVIEWED", "RESOLVED"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["reporterId", "targetUid", "targetType", "reason", "details", "reportStatus", "createdAt", "updatedAt"]
+    },
+    "Announcement": {
+      "title": "Announcement",
+      "description": "Official app-wide announcement created by verified admins.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "body": { "type": "string" },
+        "published": { "type": "boolean" },
+        "createdBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "body", "published", "createdBy", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserSettings" },
+      "description": "Private user settings and PII isolated to owner."
+    },
+    "/userProfiles/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Public discoverable chat profile without PII."
+    },
+    "/smileIds/{smileId}": {
+      "schema": { "$ref": "#/entities/SmileIdReservation" },
+      "description": "Unique Smile ID reservation lookup."
+    },
+    "/phoneLookup/{phoneHash}": {
+      "schema": { "$ref": "#/entities/PhoneLookup" },
+      "description": "Privacy-preserving SHA-256 phone number lookup."
+    },
+    "/users/{userId}/contacts/{contactUid}": {
+      "schema": { "$ref": "#/entities/UserContact" },
+      "description": "User contacts subcollection."
+    },
+    "/users/{userId}/blockedUsers/{blockedUid}": {
+      "schema": { "$ref": "#/entities/BlockedUser" },
+      "description": "Blocked users subcollection."
+    },
+    "/users/{userId}/notifications/{notificationId}": {
+      "schema": { "$ref": "#/entities/AppNotification" },
+      "description": "User notifications subcollection."
+    },
+    "/chats/{chatId}": {
+      "schema": { "$ref": "#/entities/ChatRoom" },
+      "description": "1-to-1 and group chats scoped by memberUids."
+    },
+    "/chats/{chatId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/ChatMessage" },
+      "description": "Chat messages with denormalized memberUids."
+    },
+    "/statuses/{statusId}": {
+      "schema": { "$ref": "#/entities/StatusUpdate" },
+      "description": "24-hour status updates."
+    },
+    "/statuses/{statusId}/views/{viewerUid}": {
+      "schema": { "$ref": "#/entities/StatusView" },
+      "description": "Status view receipts."
+    },
+    "/calls/{callId}": {
+      "schema": { "$ref": "#/entities/CallRecord" },
+      "description": "WebRTC call signaling & history."
+    },
+    "/communities/{communityId}": {
+      "schema": { "$ref": "#/entities/Community" },
+      "description": "Communities grouping multiple groups."
+    },
+    "/reports/{reportId}": {
+      "schema": { "$ref": "#/entities/ReportItem" },
+      "description": "User abuse and technical issue reports."
+    },
+    "/announcements/{announcementId}": {
+      "schema": { "$ref": "#/entities/Announcement" },
+      "description": "Official app announcements published by admins."
+    }
+  }
+}

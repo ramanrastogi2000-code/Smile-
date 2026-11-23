@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">SMILE</string>
+    <string name="app_tagline">बात करें, मुस्कुराएं!</string>
+    <string name="sign_in_with_google">Sign in with Google</string>
+    <string name="e2ee_badge">End-to-End Encrypted</string>
+    <string name="tab_chats">Chats</string>
+    <string name="tab_updates">Updates</string>
+    <string name="tab_calls">Calls</string>
+    <string name="tab_communities">Communities</string>
+    <string name="search_hint">Search chats, Smile IDs...</string>
+    <string name="type_message_hint">Type a message...</string>
+</resources>

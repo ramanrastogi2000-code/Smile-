@@ -1,0 +1,499 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- HARDENED GLOBAL HELPERS ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdminEmail() {
+      return isSignedIn() &&
+        request.auth.token.email == 'ramanrastogi2000@gmail.com' &&
+        request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      return isAdminEmail() || (
+        isSignedIn() &&
+        exists(/databases/$(database)/documents/adminUsers/$(request.auth.uid))
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidTimestamp(ts) {
+      return ts is timestamp && ts <= request.time;
+    }
+
+    function isBoundedStringList(arr, minLen, maxLen) {
+      return arr is list && arr.size() >= minLen && arr.size() <= maxLen && (arr.size() == 0 || arr[0] is string);
+    }
+
+    // --- ENTITY VALIDATION BLUEPRINTS ---
+
+    function isValidUserSettings(data, userId) {
+      return data.userId is string && data.userId == userId &&
+        (!('email' in data) || (data.email is string && data.email.size() <= 200)) &&
+        (!('phoneNumber' in data) || (data.phoneNumber is string && data.phoneNumber.size() <= 24)) &&
+        data.countryCode is string && data.countryCode.size() >= 1 && data.countryCode.size() <= 8 &&
+        data.language in ['EN', 'HI'] &&
+        data.darkMode is bool &&
+        data.wallpaperId is string && data.wallpaperId.size() >= 1 && data.wallpaperId.size() <= 40 &&
+        data.autoDownloadWifi is bool &&
+        data.dataSaver is bool &&
+        data.readReceipts is bool &&
+        data.notificationsEnabled is bool &&
+        data.appLockEnabled is bool &&
+        (!('pinHash' in data) || (data.pinHash is string && data.pinHash.size() <= 128)) &&
+        (!('twoStepHash' in data) || (data.twoStepHash is string && data.twoStepHash.size() <= 128)) &&
+        isValidTimestamp(data.createdAt) &&
+        isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidUserProfile(data, userId) {
+      return data.userId is string && data.userId == userId &&
+        data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 80 &&
+        data.smileId is string && data.smileId.size() >= 3 && data.smileId.size() <= 32 && data.smileId.matches('^[a-z0-9_]+$') &&
+        data.about is string && data.about.size() <= 200 &&
+        data.avatarColor is string && data.avatarColor.size() >= 4 && data.avatarColor.size() <= 16 &&
+        (!('avatarData' in data) || (data.avatarData is string && data.avatarData.size() <= 120000)) &&
+        (!('publicKey' in data) || (data.publicKey is string && data.publicKey.size() <= 512)) &&
+        data.online is bool &&
+        data.discoverable is bool &&
+        data.photoVisible in ['EVERYONE', 'CONTACTS', 'NOBODY'] &&
+        data.aboutVisible in ['EVERYONE', 'CONTACTS', 'NOBODY'] &&
+        data.lastSeenVisible in ['EVERYONE', 'CONTACTS', 'NOBODY'] &&
+        (!('lastSeenAt' in data) || isValidTimestamp(data.lastSeenAt)) &&
+        isValidTimestamp(data.createdAt) &&
+        isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidSmileIdReservation(data, smileId) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+        data.smileId is string && data.smileId == smileId && data.smileId.size() >= 3 && data.smileId.size() <= 32 && data.smileId.matches('^[a-z0-9_]+$') &&
+        data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 80 &&
+        isValidTimestamp(data.createdAt);
+    }
+
+    function isValidPhoneLookup(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+        data.smileId is string && data.smileId.size() >= 3 && data.smileId.size() <= 32 &&
+        data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 80 &&
+        isValidTimestamp(data.createdAt) &&
+        isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidUserContact(data, userId, contactUid) {
+      return data.userId is string && data.userId == userId &&
+        data.contactUid is string && data.contactUid == contactUid &&
+        data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 80 &&
+        data.smileId is string && data.smileId.size() >= 3 && data.smileId.size() <= 32 &&
+        (!('phoneHint' in data) || (data.phoneHint is string && data.phoneHint.size() <= 24)) &&
+        isValidTimestamp(data.createdAt) &&
+        isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidBlockedUser(data, userId, blockedUid) {
+      return data.userId is string && data.userId == userId &&
+        data.blockedUid is string && data.blockedUid == blockedUid &&
+        data.blockedName is string && data.blockedName.size() >= 1 && data.blockedName.size() <= 80 &&
+        isValidTimestamp(data.createdAt);
+    }
+
+    function isValidAppNotification(data, userId) {
+      return data.userId is string && data.userId == userId &&
+        data.title is string && data.title.size() >= 1 && data.title.size() <= 120 &&
+        data.body is string && data.body.size() >= 1 && data.body.size() <= 400 &&
+        data.category is string && data.category.size() >= 1 && data.category.size() <= 32 &&
+        (!('referenceId' in data) || (data.referenceId is string && data.referenceId.size() <= 128)) &&
+        data.read is bool &&
+        isValidTimestamp(data.createdAt);
+    }
+
+    function isValidChatRoom(data) {
+      return data.chatType in ['DIRECT', 'GROUP'] &&
+        data.title is string && data.title.size() >= 1 && data.title.size() <= 100 &&
+        data.description is string && data.description.size() <= 300 &&
+        data.avatarColor is string && data.avatarColor.size() >= 4 && data.avatarColor.size() <= 16 &&
+        isBoundedStringList(data.memberUids, 1, 100) &&
+        isBoundedStringList(data.adminUids, 0, 20) &&
+        isBoundedStringList(data.coAdminUids, 0, 20) &&
+        isBoundedStringList(data.pinnedBy, 0, 100) &&
+        isBoundedStringList(data.archivedBy, 0, 100) &&
+        isBoundedStringList(data.mutedBy, 0, 100) &&
+        isBoundedStringList(data.typingUids, 0, 20) &&
+        data.lastMessageText is string && data.lastMessageText.size() <= 500 &&
+        data.lastMessageSenderId is string && data.lastMessageSenderId.size() <= 128 &&
+        data.lastMessageType is string && data.lastMessageType.size() >= 1 && data.lastMessageType.size() <= 24 &&
+        data.disappearingHours is int && data.disappearingHours >= 0 && data.disappearingHours <= 720 &&
+        data.announcementsOnly is bool &&
+        data.inviteCode is string && data.inviteCode.size() <= 32 &&
+        data.communityId is string && data.communityId.size() <= 128 &&
+        data.createdBy is string && data.createdBy.size() >= 1 && data.createdBy.size() <= 128 &&
+        isValidTimestamp(data.createdAt) &&
+        isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidChatMessage(data, chatId) {
+      return data.chatId is string && data.chatId == chatId &&
+        data.senderId is string && data.senderId.size() >= 1 && data.senderId.size() <= 128 &&
+        data.senderName is string && data.senderName.size() >= 1 && data.senderName.size() <= 80 &&
+        isBoundedStringList(data.memberUids, 1, 100) &&
+        data.messageType in ['TEXT', 'IMAGE', 'AUDIO', 'DOCUMENT', 'LOCATION', 'CONTACT', 'STICKER', 'SYSTEM'] &&
+        data.body is string && data.body.size() <= 4000 &&
+        data.iv is string && data.iv.size() <= 64 &&
+        data.e2ee is bool &&
+        data.replyToId is string && data.replyToId.size() <= 128 &&
+        data.replyPreview is string && data.replyPreview.size() <= 200 &&
+        data.forwarded is bool &&
+        data.edited is bool &&
+        data.deletedForEveryone is bool &&
+        isBoundedStringList(data.deletedFor, 0, 100) &&
+        isBoundedStringList(data.starredBy, 0, 100) &&
+        data.reactions is map && data.reactions.size() <= 50 &&
+        data.deliveryStatus in ['SENT', 'DELIVERED', 'READ'] &&
+        (!('mediaName' in data) || (data.mediaName is string && data.mediaName.size() <= 200)) &&
+        (!('mediaMime' in data) || (data.mediaMime is string && data.mediaMime.size() <= 100)) &&
+        (!('mediaData' in data) || (data.mediaData is string && data.mediaData.size() <= 350000)) &&
+        (!('expiresAt' in data) || data.expiresAt is timestamp) &&
+        isValidTimestamp(data.createdAt) &&
+        isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidStatus(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+        data.authorName is string && data.authorName.size() >= 1 && data.authorName.size() <= 80 &&
+        data.authorSmileId is string && data.authorSmileId.size() >= 1 && data.authorSmileId.size() <= 32 &&
+        data.statusType in ['TEXT', 'IMAGE'] &&
+        data.textContent is string && data.textContent.size() <= 500 &&
+        data.caption is string && data.caption.size() <= 200 &&
+        data.bgColor is string && data.bgColor.size() >= 4 && data.bgColor.size() <= 16 &&
+        (!('mediaData' in data) || (data.mediaData is string && data.mediaData.size() <= 350000)) &&
+        data.privacyMode in ['EVERYONE', 'CONTACTS', 'ONLY'] &&
+        isBoundedStringList(data.allowedUids, 0, 100) &&
+        isBoundedStringList(data.viewerUids, 0, 100) &&
+        data.expiresAt is timestamp &&
+        isValidTimestamp(data.createdAt) &&
+        isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidStatusView(data, statusId, viewerUid) {
+      return data.statusId is string && data.statusId == statusId &&
+        data.viewerUid is string && data.viewerUid == viewerUid &&
+        data.viewerName is string && data.viewerName.size() >= 1 && data.viewerName.size() <= 80 &&
+        data.ownerUid is string && data.ownerUid.size() >= 1 && data.ownerUid.size() <= 128 &&
+        isValidTimestamp(data.viewedAt);
+    }
+
+    function isValidCall(data) {
+      return data.callerId is string && data.callerId.size() >= 1 && data.callerId.size() <= 128 &&
+        data.callerName is string && data.callerName.size() >= 1 && data.callerName.size() <= 80 &&
+        data.title is string && data.title.size() >= 1 && data.title.size() <= 100 &&
+        isBoundedStringList(data.participantUids, 2, 20) &&
+        data.callType in ['VOICE', 'VIDEO'] &&
+        data.groupCall is bool &&
+        data.callStatus in ['RINGING', 'ACTIVE', 'ENDED', 'MISSED', 'DECLINED'] &&
+        data.sdpOffer is string && data.sdpOffer.size() <= 8000 &&
+        data.sdpAnswer is string && data.sdpAnswer.size() <= 8000 &&
+        isBoundedStringList(data.iceCandidates, 0, 50) &&
+        data.durationSeconds is int && data.durationSeconds >= 0 && data.durationSeconds <= 86400 &&
+        isValidTimestamp(data.createdAt) &&
+        isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidCommunity(data) {
+      return data.name is string && data.name.size() >= 1 && data.name.size() <= 100 &&
+        data.description is string && data.description.size() <= 400 &&
+        data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 &&
+        isBoundedStringList(data.adminUids, 1, 20) &&
+        isBoundedStringList(data.memberUids, 1, 200) &&
+        isBoundedStringList(data.groupIds, 0, 50) &&
+        data.announcementText is string && data.announcementText.size() <= 500 &&
+        data.avatarColor is string && data.avatarColor.size() >= 4 && data.avatarColor.size() <= 16 &&
+        isValidTimestamp(data.createdAt) &&
+        isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidReport(data) {
+      return data.reporterId is string && data.reporterId.size() >= 1 && data.reporterId.size() <= 128 &&
+        data.targetUid is string && data.targetUid.size() <= 128 &&
+        data.targetType in ['USER', 'GROUP', 'TECHNICAL'] &&
+        data.reason is string && data.reason.size() >= 1 && data.reason.size() <= 120 &&
+        data.details is string && data.details.size() <= 1000 &&
+        data.reportStatus in ['OPEN', 'REVIEWED', 'RESOLVED'] &&
+        isValidTimestamp(data.createdAt) &&
+        isValidTimestamp(data.updatedAt);
+    }
+
+    // --- COLLECTION RULES ---
+
+    match /users/{userId} {
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isOwner(userId) || isAdminEmail();
+      allow create: if isOwner(userId) && isValidId(userId) &&
+        incoming().keys().hasAll(['userId', 'countryCode', 'language', 'darkMode', 'wallpaperId', 'autoDownloadWifi', 'dataSaver', 'readReceipts', 'notificationsEnabled', 'appLockEnabled', 'createdAt', 'updatedAt']) &&
+        incoming().keys().hasOnly(['userId', 'email', 'phoneNumber', 'countryCode', 'language', 'darkMode', 'wallpaperId', 'autoDownloadWifi', 'dataSaver', 'readReceipts', 'notificationsEnabled', 'appLockEnabled', 'pinHash', 'twoStepHash', 'createdAt', 'updatedAt']) &&
+        isValidUserSettings(incoming(), userId);
+      allow update: if isOwner(userId) && isValidId(userId) &&
+        isValidUserSettings(incoming(), userId) &&
+        incoming().userId == existing().userId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['email', 'phoneNumber', 'countryCode', 'language', 'darkMode', 'wallpaperId', 'autoDownloadWifi', 'dataSaver', 'readReceipts', 'notificationsEnabled', 'appLockEnabled', 'pinHash', 'twoStepHash', 'updatedAt']);
+      allow delete: if isOwner(userId);
+
+      match /contacts/{contactUid} {
+        allow get: if isOwner(userId) && isValidId(contactUid);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(contactUid) &&
+          incoming().keys().hasAll(['userId', 'contactUid', 'displayName', 'smileId', 'createdAt', 'updatedAt']) &&
+          incoming().keys().hasOnly(['userId', 'contactUid', 'displayName', 'smileId', 'phoneHint', 'createdAt', 'updatedAt']) &&
+          isValidUserContact(incoming(), userId, contactUid);
+        allow update: if isOwner(userId) && isValidId(contactUid) &&
+          isValidUserContact(incoming(), userId, contactUid) &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'smileId', 'phoneHint', 'updatedAt']);
+        allow delete: if isOwner(userId) && isValidId(contactUid);
+      }
+
+      match /blockedUsers/{blockedUid} {
+        allow get: if isOwner(userId) && isValidId(blockedUid);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(blockedUid) &&
+          incoming().keys().hasAll(['userId', 'blockedUid', 'blockedName', 'createdAt']) &&
+          incoming().keys().hasOnly(['userId', 'blockedUid', 'blockedName', 'createdAt']) &&
+          isValidBlockedUser(incoming(), userId, blockedUid);
+        allow delete: if isOwner(userId) && isValidId(blockedUid);
+      }
+
+      match /notifications/{notificationId} {
+        allow get: if isOwner(userId) && isValidId(notificationId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(notificationId) &&
+          incoming().keys().hasAll(['userId', 'title', 'body', 'category', 'read', 'createdAt']) &&
+          incoming().keys().hasOnly(['userId', 'title', 'body', 'category', 'referenceId', 'read', 'createdAt']) &&
+          isValidAppNotification(incoming(), userId);
+        allow update: if isOwner(userId) && isValidId(notificationId) &&
+          isValidAppNotification(incoming(), userId) &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['read']);
+        allow delete: if isOwner(userId) && isValidId(notificationId);
+      }
+    }
+
+    match /userProfiles/{userId} {
+      allow get: if isSignedIn() && isValidId(userId);
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.discoverable == true || isAdminEmail());
+      allow create: if isOwner(userId) && isValidId(userId) &&
+        incoming().keys().hasAll(['userId', 'displayName', 'smileId', 'about', 'avatarColor', 'online', 'discoverable', 'photoVisible', 'aboutVisible', 'lastSeenVisible', 'createdAt', 'updatedAt']) &&
+        incoming().keys().hasOnly(['userId', 'displayName', 'smileId', 'about', 'avatarColor', 'avatarData', 'publicKey', 'online', 'discoverable', 'photoVisible', 'aboutVisible', 'lastSeenVisible', 'lastSeenAt', 'createdAt', 'updatedAt']) &&
+        isValidUserProfile(incoming(), userId);
+      allow update: if (isOwner(userId) || isAdmin()) && isValidId(userId) &&
+        isValidUserProfile(incoming(), userId) &&
+        incoming().userId == existing().userId &&
+        incoming().createdAt == existing().createdAt &&
+        (isAdmin() || incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'smileId', 'about', 'avatarColor', 'avatarData', 'publicKey', 'online', 'discoverable', 'photoVisible', 'aboutVisible', 'lastSeenVisible', 'lastSeenAt', 'updatedAt']));
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+
+    match /smileIds/{smileId} {
+      allow get: if isSignedIn() && isValidId(smileId);
+      allow list: if false;
+      allow create: if isSignedIn() && isValidId(smileId) &&
+        incoming().userId == request.auth.uid &&
+        !exists(/databases/$(database)/documents/smileIds/$(smileId)) &&
+        incoming().keys().hasAll(['userId', 'smileId', 'displayName', 'createdAt']) &&
+        incoming().keys().hasOnly(['userId', 'smileId', 'displayName', 'createdAt']) &&
+        isValidSmileIdReservation(incoming(), smileId);
+      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+    }
+
+    match /phoneLookup/{phoneHash} {
+      allow get: if isSignedIn() && isValidId(phoneHash);
+      allow list: if false;
+      allow create: if isSignedIn() && isValidId(phoneHash) &&
+        incoming().userId == request.auth.uid &&
+        incoming().keys().hasAll(['userId', 'smileId', 'displayName', 'createdAt', 'updatedAt']) &&
+        incoming().keys().hasOnly(['userId', 'smileId', 'displayName', 'createdAt', 'updatedAt']) &&
+        isValidPhoneLookup(incoming());
+      allow update: if isSignedIn() && isValidId(phoneHash) &&
+        existing().userId == request.auth.uid &&
+        incoming().userId == existing().userId &&
+        incoming().createdAt == existing().createdAt &&
+        isValidPhoneLookup(incoming()) &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['smileId', 'displayName', 'updatedAt']);
+      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+    }
+
+    match /chats/{chatId} {
+      allow get: if isSignedIn() && isValidId(chatId) && (request.auth.uid in existing().memberUids || isAdmin());
+      allow list: if isSignedIn() && (request.auth.uid in resource.data.memberUids || isAdminEmail());
+      allow create: if isSignedIn() && isValidId(chatId) &&
+        incoming().createdBy == request.auth.uid &&
+        request.auth.uid in incoming().memberUids &&
+        incoming().keys().hasAll(['chatType', 'title', 'description', 'avatarColor', 'memberUids', 'adminUids', 'coAdminUids', 'pinnedBy', 'archivedBy', 'mutedBy', 'typingUids', 'lastMessageText', 'lastMessageSenderId', 'lastMessageType', 'disappearingHours', 'announcementsOnly', 'inviteCode', 'communityId', 'createdBy', 'createdAt', 'updatedAt']) &&
+        incoming().keys().hasOnly(['chatType', 'title', 'description', 'avatarColor', 'memberUids', 'adminUids', 'coAdminUids', 'pinnedBy', 'archivedBy', 'mutedBy', 'typingUids', 'lastMessageText', 'lastMessageSenderId', 'lastMessageType', 'disappearingHours', 'announcementsOnly', 'inviteCode', 'communityId', 'createdBy', 'createdAt', 'updatedAt']) &&
+        isValidChatRoom(incoming());
+      allow update: if isSignedIn() && isValidId(chatId) &&
+        isValidChatRoom(incoming()) &&
+        incoming().createdBy == existing().createdBy &&
+        incoming().createdAt == existing().createdAt &&
+        (
+          isAdmin() ||
+          (request.auth.uid in existing().adminUids &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['title', 'description', 'avatarColor', 'memberUids', 'adminUids', 'coAdminUids', 'pinnedBy', 'archivedBy', 'mutedBy', 'typingUids', 'lastMessageText', 'lastMessageSenderId', 'lastMessageType', 'disappearingHours', 'announcementsOnly', 'inviteCode', 'communityId', 'updatedAt'])) ||
+          (request.auth.uid in existing().coAdminUids &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['title', 'description', 'memberUids', 'pinnedBy', 'archivedBy', 'mutedBy', 'typingUids', 'lastMessageText', 'lastMessageSenderId', 'lastMessageType', 'updatedAt'])) ||
+          (request.auth.uid in existing().memberUids &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['pinnedBy', 'archivedBy', 'mutedBy', 'typingUids', 'lastMessageText', 'lastMessageSenderId', 'lastMessageType', 'disappearingHours', 'updatedAt']))
+        );
+      allow delete: if isSignedIn() && isValidId(chatId) && (request.auth.uid == existing().createdBy || request.auth.uid in existing().adminUids || isAdmin());
+
+      match /messages/{messageId} {
+        allow get: if isSignedIn() && isValidId(chatId) && isValidId(messageId) && request.auth.uid in existing().memberUids;
+        allow list: if isSignedIn() && isValidId(chatId) && request.auth.uid in resource.data.memberUids;
+        allow create: if isSignedIn() && isValidId(chatId) && isValidId(messageId) &&
+          incoming().senderId == request.auth.uid &&
+          request.auth.uid in incoming().memberUids &&
+          incoming().keys().hasAll(['chatId', 'senderId', 'senderName', 'memberUids', 'messageType', 'body', 'iv', 'e2ee', 'replyToId', 'replyPreview', 'forwarded', 'edited', 'deletedForEveryone', 'deletedFor', 'starredBy', 'reactions', 'deliveryStatus', 'createdAt', 'updatedAt']) &&
+          incoming().keys().hasOnly(['chatId', 'senderId', 'senderName', 'memberUids', 'messageType', 'body', 'iv', 'e2ee', 'replyToId', 'replyPreview', 'forwarded', 'edited', 'deletedForEveryone', 'deletedFor', 'starredBy', 'reactions', 'deliveryStatus', 'mediaName', 'mediaMime', 'mediaData', 'expiresAt', 'createdAt', 'updatedAt']) &&
+          isValidChatMessage(incoming(), chatId);
+        allow update: if isSignedIn() && isValidId(chatId) && isValidId(messageId) &&
+          request.auth.uid in existing().memberUids &&
+          isValidChatMessage(incoming(), chatId) &&
+          incoming().chatId == existing().chatId &&
+          incoming().senderId == existing().senderId &&
+          incoming().createdAt == existing().createdAt &&
+          (
+            (request.auth.uid == existing().senderId &&
+              incoming().diff(existing()).affectedKeys().hasOnly(['body', 'iv', 'edited', 'deletedForEveryone', 'updatedAt'])) ||
+            incoming().diff(existing()).affectedKeys().hasOnly(['reactions', 'starredBy', 'deletedFor', 'deliveryStatus', 'updatedAt'])
+          );
+        allow delete: if isSignedIn() && isValidId(chatId) && isValidId(messageId) && request.auth.uid == existing().senderId;
+      }
+    }
+
+    match /statuses/{statusId} {
+      allow get: if isSignedIn() && isValidId(statusId) &&
+        (existing().userId == request.auth.uid || existing().privacyMode == 'EVERYONE' || request.auth.uid in existing().allowedUids);
+      allow list: if isSignedIn() &&
+        (resource.data.userId == request.auth.uid || resource.data.privacyMode == 'EVERYONE' || request.auth.uid in resource.data.allowedUids);
+      allow create: if isSignedIn() && isValidId(statusId) &&
+        incoming().userId == request.auth.uid &&
+        incoming().keys().hasAll(['userId', 'authorName', 'authorSmileId', 'statusType', 'textContent', 'caption', 'bgColor', 'privacyMode', 'allowedUids', 'viewerUids', 'expiresAt', 'createdAt', 'updatedAt']) &&
+        incoming().keys().hasOnly(['userId', 'authorName', 'authorSmileId', 'statusType', 'textContent', 'caption', 'bgColor', 'mediaData', 'privacyMode', 'allowedUids', 'viewerUids', 'expiresAt', 'createdAt', 'updatedAt']) &&
+        isValidStatus(incoming());
+      allow update: if isSignedIn() && isValidId(statusId) &&
+        isValidStatus(incoming()) &&
+        incoming().userId == existing().userId &&
+        incoming().createdAt == existing().createdAt &&
+        (
+          (request.auth.uid == existing().userId &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['textContent', 'caption', 'privacyMode', 'allowedUids', 'updatedAt'])) ||
+          ((existing().privacyMode == 'EVERYONE' || request.auth.uid in existing().allowedUids) &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['viewerUids', 'updatedAt']))
+        );
+      allow delete: if isSignedIn() && isValidId(statusId) && existing().userId == request.auth.uid;
+
+      match /views/{viewerUid} {
+        allow get: if isSignedIn() && isValidId(statusId) && isValidId(viewerUid) &&
+          (viewerUid == request.auth.uid || existing().ownerUid == request.auth.uid);
+        allow list: if isSignedIn() && isValidId(statusId) && resource.data.ownerUid == request.auth.uid;
+        allow create, update: if isOwner(viewerUid) && isValidId(statusId) && isValidId(viewerUid) &&
+          incoming().keys().hasAll(['statusId', 'viewerUid', 'viewerName', 'ownerUid', 'viewedAt']) &&
+          incoming().keys().hasOnly(['statusId', 'viewerUid', 'viewerName', 'ownerUid', 'viewedAt']) &&
+          isValidStatusView(incoming(), statusId, viewerUid);
+      }
+    }
+
+    match /calls/{callId} {
+      allow get: if isSignedIn() && isValidId(callId) && request.auth.uid in existing().participantUids;
+      allow list: if isSignedIn() && request.auth.uid in resource.data.participantUids;
+      allow create: if isSignedIn() && isValidId(callId) &&
+        incoming().callerId == request.auth.uid &&
+        request.auth.uid in incoming().participantUids &&
+        incoming().keys().hasAll(['callerId', 'callerName', 'title', 'participantUids', 'callType', 'groupCall', 'callStatus', 'sdpOffer', 'sdpAnswer', 'iceCandidates', 'durationSeconds', 'createdAt', 'updatedAt']) &&
+        incoming().keys().hasOnly(['callerId', 'callerName', 'title', 'participantUids', 'callType', 'groupCall', 'callStatus', 'sdpOffer', 'sdpAnswer', 'iceCandidates', 'durationSeconds', 'createdAt', 'updatedAt']) &&
+        isValidCall(incoming());
+      allow update: if isSignedIn() && isValidId(callId) &&
+        request.auth.uid in existing().participantUids &&
+        existing().callStatus in ['RINGING', 'ACTIVE'] &&
+        isValidCall(incoming()) &&
+        incoming().callerId == existing().callerId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['callStatus', 'sdpOffer', 'sdpAnswer', 'iceCandidates', 'durationSeconds', 'updatedAt']);
+      allow delete: if isSignedIn() && isValidId(callId) && request.auth.uid == existing().callerId;
+    }
+
+    match /communities/{communityId} {
+      allow get: if isSignedIn() && isValidId(communityId) && (request.auth.uid in existing().memberUids || isAdmin());
+      allow list: if isSignedIn() && (request.auth.uid in resource.data.memberUids || isAdminEmail());
+      allow create: if isSignedIn() && isValidId(communityId) &&
+        incoming().ownerId == request.auth.uid &&
+        request.auth.uid in incoming().adminUids &&
+        request.auth.uid in incoming().memberUids &&
+        incoming().keys().hasAll(['name', 'description', 'ownerId', 'adminUids', 'memberUids', 'groupIds', 'announcementText', 'avatarColor', 'createdAt', 'updatedAt']) &&
+        incoming().keys().hasOnly(['name', 'description', 'ownerId', 'adminUids', 'memberUids', 'groupIds', 'announcementText', 'avatarColor', 'createdAt', 'updatedAt']) &&
+        isValidCommunity(incoming());
+      allow update: if isSignedIn() && isValidId(communityId) &&
+        (request.auth.uid in existing().adminUids || isAdmin()) &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().createdAt == existing().createdAt &&
+        isValidCommunity(incoming()) &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['name', 'description', 'adminUids', 'memberUids', 'groupIds', 'announcementText', 'avatarColor', 'updatedAt']);
+      allow delete: if isSignedIn() && isValidId(communityId) && (request.auth.uid == existing().ownerId || isAdmin());
+    }
+
+    match /reports/{reportId} {
+      allow get: if isSignedIn() && isValidId(reportId) && (existing().reporterId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.reporterId == request.auth.uid || isAdminEmail());
+      allow create: if isSignedIn() && isValidId(reportId) &&
+        incoming().reporterId == request.auth.uid &&
+        incoming().reportStatus == 'OPEN' &&
+        incoming().keys().hasAll(['reporterId', 'targetUid', 'targetType', 'reason', 'details', 'reportStatus', 'createdAt', 'updatedAt']) &&
+        incoming().keys().hasOnly(['reporterId', 'targetUid', 'targetType', 'reason', 'details', 'reportStatus', 'createdAt', 'updatedAt']) &&
+        isValidReport(incoming());
+      allow update: if isAdmin() && isValidId(reportId) &&
+        isValidReport(incoming()) &&
+        incoming().reporterId == existing().reporterId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['reportStatus', 'updatedAt']);
+    }
+
+    match /announcements/{announcementId} {
+      allow get: if isSignedIn() && (resource.data.published == true || isAdmin());
+      allow list: if isSignedIn() && (resource.data.published == true || isAdminEmail());
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /adminUsers/{adminUid} {
+      allow get: if isOwner(adminUid) || isAdmin();
+      allow list, create, update, delete: if false;
+    }
+
+    match /auditLogs/{logId} {
+      allow get, create: if isAdmin();
+      allow list: if isAdminEmail();
+      allow update, delete: if false;
+    }
+  }
+}

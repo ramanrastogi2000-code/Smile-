@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SMILE Admin Console (Private Owner Portal)</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="smile-badge" aria-hidden="true">☺</div>
+      <div>
+        <h1>SMILE Owner &amp; Moderation Console</h1>
+        <p class="tagline">बात करें, मुस्कुराएं! • Private Web Administration</p>
+      </div>
+    </div>
+    <div class="auth-bar">
+      <span id="adminUserLabel" class="muted">Not signed in</span>
+      <button id="signInBtn" class="btn btn-primary">Sign in with Google</button>
+      <button id="signOutBtn" class="btn btn-outline hidden">Sign out</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <section id="configWarning" class="card warning-card hidden">
+      <h2>Web App Configuration Required</h2>
+      <p>
+        Register a Web App in Firebase Console for project
+        <code>gen-lang-client-0029743851</code> and paste your public Firebase Web config into
+        <code>admin-dashboard/app.js</code> (<code>FIREBASE_WEB_CONFIG</code>), then host privately via Firebase Hosting.
+      </p>
+    </section>
+
+    <section id="loginGate" class="card gate-card">
+      <h2>Restricted Administrator Access</h2>
+      <p>
+        This portal is strictly separated from the SMILE Android APK. Access is verified server-side by
+        Firestore Security Rules against authorized owner credentials and <code>/adminUsers</code>.
+      </p>
+      <div id="accessError" class="error-banner hidden"></div>
+    </section>
+
+    <div id="dashboardContent" class="hidden">
+      <section class="metrics-grid">
+        <article class="card metric">
+          <span class="metric-label">Registered Profiles</span>
+          <strong id="metricUsers">0</strong>
+        </article>
+        <article class="card metric">
+          <span class="metric-label">Active Chats &amp; Groups</span>
+          <strong id="metricChats">0</strong>
+        </article>
+        <article class="card metric">
+          <span class="metric-label">Communities</span>
+          <strong id="metricCommunities">0</strong>
+        </article>
+        <article class="card metric">
+          <span class="metric-label">Open Abuse Reports</span>
+          <strong id="metricReports">0</strong>
+        </article>
+      </section>
+
+      <section class="grid-two">
+        <article class="card">
+          <div class="card-header">
+            <h2>Broadcast System Announcement</h2>
+          </div>
+          <form id="announcementForm" class="stack">
+            <input id="annTitle" type="text" maxlength="100" placeholder="Announcement title (e.g. Scheduled Maintenance)" required />
+            <textarea id="annBody" rows="3" maxlength="500" placeholder="Announcement message visible to SMILE users..." required></textarea>
+            <button type="submit" class="btn btn-primary">Publish Announcement</button>
+          </form>
+        </article>
+
+        <article class="card">
+          <div class="card-header">
+            <h2>Recent Announcements</h2>
+          </div>
+          <ul id="announcementsList" class="item-list"></ul>
+        </article>
+      </section>
+
+      <section class="card">
+        <div class="card-header">
+          <h2>Abuse &amp; Support Reports</h2>
+          <button id="refreshBtn" class="btn btn-outline">Refresh Data</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Target</th>
+                <th>Type</th>
+                <th>Reason</th>
+                <th>Details</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="reportsTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-header">
+          <h2>Registered SMILE Users</h2>
+          <input id="userSearchInput" type="search" placeholder="Search by name or @smile_id..." />
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Display Name</th>
+                <th>Smile ID</th>
+                <th>Visibility</th>
+                <th>Online</th>
+                <th>Moderation</th>
+              </tr>
+            </thead>
+            <tbody id="usersTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-header">
+          <h2>Admin Audit Logs</h2>
+        </div>
+        <ul id="auditLogsList" class="item-list"></ul>
+      </section>
+    </div>
+  </main>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
